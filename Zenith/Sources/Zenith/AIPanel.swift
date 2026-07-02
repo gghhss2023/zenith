@@ -78,12 +78,30 @@ final class AIPanel: NSPanel {
 
     override func cancelOperation(_ sender: Any?) {
         bridge.cancel()
+        dismiss()
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command),
+           event.charactersIgnoringModifiers == "k" {
+            bridge.cancel()
+            dismiss()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    private func dismiss() {
         orderOut(nil)
+        if let tv = terminalView, let win = tv.window {
+            win.makeKeyAndOrderFront(nil)
+            win.makeFirstResponder(tv)
+        }
     }
 
     func toggle(over window: NSWindow?) {
         if isVisible {
-            orderOut(nil)
+            dismiss()
             return
         }
         if let parent = window {
@@ -155,7 +173,7 @@ final class AIPanel: NSPanel {
             return
         }
         terminalView?.insertToPrompt(command)
-        orderOut(nil)
+        dismiss()
     }
 
     private func extractFixCommand() -> String? {
