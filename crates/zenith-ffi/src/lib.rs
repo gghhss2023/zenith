@@ -249,6 +249,7 @@ pub struct ZNConfig {
     pub font_family: *const c_char,
     pub window_opacity: f32,
     pub scrollback_lines: u32,
+    pub ai_model: *const c_char,
 }
 
 #[no_mangle]
@@ -300,11 +301,13 @@ pub extern "C" fn zn_string_free(s: *mut c_char) {
 pub extern "C" fn zn_config_load() -> *mut ZNConfig {
     let config = zenith_config::Config::load();
     let family = CString::new(config.appearance.font_family.as_str()).unwrap();
+    let ai_model = CString::new(config.ai.model.as_str()).unwrap();
     let cfg = Box::new(ZNConfig {
         font_size: config.appearance.font_size,
         font_family: family.into_raw(),
         window_opacity: config.appearance.window_opacity,
         scrollback_lines: config.terminal.scrollback_lines as u32,
+        ai_model: ai_model.into_raw(),
     });
     Box::into_raw(cfg)
 }
@@ -315,6 +318,7 @@ pub extern "C" fn zn_config_free(cfg: *mut ZNConfig) {
         unsafe {
             let cfg = Box::from_raw(cfg);
             let _ = CString::from_raw(cfg.font_family as *mut c_char);
+            let _ = CString::from_raw(cfg.ai_model as *mut c_char);
         }
     }
 }

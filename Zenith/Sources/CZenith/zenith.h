@@ -50,6 +50,7 @@ typedef struct {
     const char *font_family;
     float window_opacity;
     uint32_t scrollback_lines;
+    const char *ai_model;
 } ZNConfig;
 
 void zn_init(void);
