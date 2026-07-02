@@ -577,4 +577,15 @@ mod tests {
         let result = t.grid().display_text_range((0, 0), (19, 0));
         assert_eq!(result, "hi");
     }
+
+    #[test]
+    fn screen_text_includes_scrollback_and_screen() {
+        let mut term = Terminal::new(10, 2);
+        term.feed(b"one\r\ntwo\r\nthree\r\nfour");
+        // 2-row grid: "one" and "two" scrolled into scrollback,
+        // visible screen shows "three" and "four"
+        assert_eq!(term.grid().screen_text(50), "one\ntwo\nthree\nfour");
+        // scrollback limited to last 1 line
+        assert_eq!(term.grid().screen_text(1), "two\nthree\nfour");
+    }
 }

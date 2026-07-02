@@ -205,4 +205,28 @@ impl Grid {
 
         rows_text.join("\n")
     }
+
+    pub fn screen_text(&self, scrollback_lines: usize) -> String {
+        let n = scrollback_lines.min(self.scrollback.len());
+        let mut lines: Vec<String> = Vec::with_capacity(n + self.rows);
+        for line in &self.scrollback[self.scrollback.len() - n..] {
+            let mut s = String::new();
+            for cell in line {
+                if cell.width != 0 {
+                    s.push(cell.c);
+                }
+            }
+            lines.push(s.trim_end().to_string());
+        }
+        for row in 0..self.rows {
+            let mut s = String::new();
+            for cell in self.row_slice(row) {
+                if cell.width != 0 {
+                    s.push(cell.c);
+                }
+            }
+            lines.push(s.trim_end().to_string());
+        }
+        lines.join("\n")
+    }
 }

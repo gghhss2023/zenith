@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub appearance: Appearance,
     pub terminal: Terminal,
+    pub ai: Ai,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,6 +30,7 @@ impl Default for Config {
         Self {
             appearance: Appearance::default(),
             terminal: Terminal::default(),
+            ai: Ai::default(),
         }
     }
 }
@@ -53,6 +55,20 @@ impl Default for Terminal {
     }
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Ai {
+    pub model: String,
+}
+
+impl Default for Ai {
+    fn default() -> Self {
+        Self {
+            model: "sonnet".into(),
+        }
+    }
+}
+
 impl Config {
     pub fn load() -> Self {
         let path = Self::config_path();
@@ -69,5 +85,18 @@ impl Config {
             .unwrap_or_else(|| PathBuf::from("~/.config"))
             .join("zenith")
             .join("zenith.toml")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ai_model_default_and_override() {
+        let c: Config = toml::from_str("").unwrap();
+        assert_eq!(c.ai.model, "sonnet");
+        let c: Config = toml::from_str("[ai]\nmodel = \"opus\"").unwrap();
+        assert_eq!(c.ai.model, "opus");
     }
 }
