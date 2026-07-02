@@ -22,7 +22,8 @@
 | 安全规则 | AI 生成的命令只填入提示行，永不自动执行 | 用户回车是最后安检，防 LLM 出错与 prompt injection |
 | 上下文范围 | 当前屏幕 + 最近 50 行滚动回看 | 够用、响应快、不过度泄露会话历史 |
 | 面板实现 | 原生 AppKit（NSPanel + NSTextView） | 免去 Metal 自绘 UI 的文字排版/滚动/无障碍工作 |
-| AI 输出 | `--output-format stream-json` 流式逐字显示 | 避免 5-10 秒空等 |
+| AI 输出 | stream-json + `--include-partial-messages` 流式逐字显示 | 避免 5-10 秒空等（已实测：无 partial 标志则无 text_delta） |
+| 子进程隔离 | `--setting-sources "" --tools "" --strict-mcp-config` | 不加载用户 hooks/记忆/插件；禁用全部工具和 MCP，AI 无法自己执行命令（已实测 tools:[]）。禁用 `--bare`：会丢登录凭据 |
 | 补全数据源 | OSC 133 shell 集成（非键入跟踪启发式） | 业界标准（Warp/iTerm2/kitty），精确知道命令起点 |
 | 补全接受键 | `→`（光标在行尾时） | fish/zsh-autosuggestions 既有肌肉记忆 |
 
@@ -46,8 +47,10 @@
 - zenith.h 手工维护（cbindgen 已禁用），需同步声明
 
 **3. ClaudeBridge（Swift, 新文件 `ClaudeBridge.swift`）**
-- `Process` 启动 `claude -p <prompt> --output-format stream-json --verbose`
-- 后台队列逐行读 stdout，解析 JSONL 提取文本增量，主线程回调更新面板
+- `Process` 启动（完整命令已实测验证，claude CLI v2.1.139）：
+  `claude -p <prompt> --setting-sources "" --tools "" --strict-mcp-config --output-format stream-json --verbose --include-partial-messages`
+- 后台队列逐行读 stdout，解析 JSONL：取 `stream_event` → `content_block_delta` → `text_delta` 增量文本，主线程回调更新面板；`result` 事件收尾（含 `is_error`）
+- 跳过用户设置后默认模型为 sonnet（实测），对面板场景速度/质量合适；暂不暴露模型配置
 - 60 秒超时终止进程；`claude` 不在 PATH 时面板内显示安装提示
 - 每次请求独立进程，无会话保持（YAGNI）
 
