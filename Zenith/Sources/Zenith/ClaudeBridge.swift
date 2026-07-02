@@ -61,37 +61,41 @@ final class ClaudeBridge {
         ]
         let stdout = Pipe()
         proc.standardOutput = stdout
-        proc.standardError = Pipe()
+        proc.standardError = FileHandle.nullDevice
 
         var buffer = Data()
         var fullText = ""
         var resultError: String?
         var didTimeout = false
 
+        func drainBuffer() {
+            while let nlRange = buffer.range(of: Data([0x0A])) {
+                let lineData = buffer.subdata(in: buffer.startIndex..<nlRange.lowerBound)
+                buffer.removeSubrange(buffer.startIndex..<nlRange.upperBound)
+                guard let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                      let type = obj["type"] as? String else { continue }
+                if type == "stream_event",
+                   let event = obj["event"] as? [String: Any],
+                   event["type"] as? String == "content_block_delta",
+                   let delta = event["delta"] as? [String: Any],
+                   delta["type"] as? String == "text_delta",
+                   let text = delta["text"] as? String {
+                    fullText += text
+                    DispatchQueue.main.async { onDelta(text) }
+                } else if type == "result" {
+                    if obj["is_error"] as? Bool == true {
+                        resultError = obj["result"] as? String ?? "unknown error"
+                    }
+                }
+            }
+        }
+
         stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
             guard let self = self, !chunk.isEmpty else { return }
             self.queue.async {
                 buffer.append(chunk)
-                while let nlRange = buffer.range(of: Data([0x0A])) {
-                    let lineData = buffer.subdata(in: buffer.startIndex..<nlRange.lowerBound)
-                    buffer.removeSubrange(buffer.startIndex..<nlRange.upperBound)
-                    guard let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                          let type = obj["type"] as? String else { continue }
-                    if type == "stream_event",
-                       let event = obj["event"] as? [String: Any],
-                       event["type"] as? String == "content_block_delta",
-                       let delta = event["delta"] as? [String: Any],
-                       delta["type"] as? String == "text_delta",
-                       let text = delta["text"] as? String {
-                        fullText += text
-                        DispatchQueue.main.async { onDelta(text) }
-                    } else if type == "result" {
-                        if obj["is_error"] as? Bool == true {
-                            resultError = obj["result"] as? String ?? "unknown error"
-                        }
-                    }
-                }
+                drainBuffer()
             }
         }
 
@@ -99,6 +103,11 @@ final class ClaudeBridge {
             guard let self = self else { return }
             self.queue.async {
                 stdout.fileHandleForReading.readabilityHandler = nil
+                let remaining = stdout.fileHandleForReading.readDataToEndOfFile()
+                if !remaining.isEmpty {
+                    buffer.append(remaining)
+                    drainBuffer()
+                }
                 self.timeoutItem?.cancel()
                 let result: Result<String, BridgeError>
                 if didTimeout {
