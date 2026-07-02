@@ -274,6 +274,22 @@ pub extern "C" fn zn_terminal_selection_text(
 }
 
 #[no_mangle]
+pub extern "C" fn zn_terminal_screen_text(
+    term: *mut ZenithTerminal,
+    scrollback_lines: u32,
+) -> *mut c_char {
+    if term.is_null() {
+        return std::ptr::null_mut();
+    }
+    let term = unsafe { &*term };
+    let text = term.term.grid().screen_text(scrollback_lines as usize);
+    if text.is_empty() {
+        return std::ptr::null_mut();
+    }
+    CString::new(text).unwrap_or_default().into_raw()
+}
+
+#[no_mangle]
 pub extern "C" fn zn_string_free(s: *mut c_char) {
     if !s.is_null() {
         unsafe { drop(CString::from_raw(s)) }
