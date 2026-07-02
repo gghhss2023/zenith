@@ -50,7 +50,7 @@
 - `Process` 启动（完整命令已实测验证，claude CLI v2.1.139）：
   `claude -p <prompt> --setting-sources "" --tools "" --strict-mcp-config --output-format stream-json --verbose --include-partial-messages`
 - 后台队列逐行读 stdout，解析 JSONL：取 `stream_event` → `content_block_delta` → `text_delta` 增量文本，主线程回调更新面板；`result` 事件收尾（含 `is_error`）
-- 跳过用户设置后默认模型为 sonnet（实测），对面板场景速度/质量合适；暂不暴露模型配置
+- 模型通过 zenith.toml 配置：`[ai] model = "sonnet"`（默认，速度/额度友好），可切 `"opus"`（复杂诊断更准）；ClaudeBridge 追加 `--model <值>` 参数
 - 60 秒超时终止进程；`claude` 不在 PATH 时面板内显示安装提示
 - 每次请求独立进程，无会话保持（YAGNI）
 
@@ -91,7 +91,7 @@
 
 ## 非目标（本设计不做）
 
-- 多 AI 后端抽象 / API 直连 / 本地模型
+- 多 AI 后端抽象 / API 直连 / 本地模型（模型仅限 claude CLI 的 `--model` 切换）
 - Warp 式命令块 UI（OSC 133 只做数据层）
 - AI 自动执行命令、Agent 模式
 - 补全的模糊匹配/频率排序（v1 只做前缀 + 最近优先）
