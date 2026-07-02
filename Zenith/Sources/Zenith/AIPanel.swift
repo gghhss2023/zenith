@@ -21,6 +21,7 @@ final class AIPanel: NSPanel {
     private weak var terminalView: TerminalMetalView?
     private let aiModel: String
     private var responseText = ""
+    private var responseMode: Mode = .command
 
     init(terminalView: TerminalMetalView, model: String) {
         self.terminalView = terminalView
@@ -100,6 +101,7 @@ final class AIPanel: NSPanel {
     }
 
     @objc private func modeChanged() {
+        bridge.cancel()
         insertButton.isEnabled = false
         inputField.placeholderString = mode == .diagnose
             ? "可留空，直接回车让 AI 分析屏幕上的报错"
@@ -116,7 +118,7 @@ final class AIPanel: NSPanel {
 
         let context = terminalView?.screenText() ?? ""
         let prompt = buildPrompt(mode: mode, input: input, context: context)
-        let currentMode = mode
+        responseMode = mode
 
         bridge.query(prompt: prompt, model: aiModel, onDelta: { [weak self] delta in
             guard let self = self else { return }
@@ -127,7 +129,7 @@ final class AIPanel: NSPanel {
             guard let self = self else { return }
             switch result {
             case .success:
-                switch currentMode {
+                switch self.responseMode {
                 case .command:
                     self.insertButton.isEnabled = true
                 case .diagnose:
@@ -143,7 +145,7 @@ final class AIPanel: NSPanel {
 
     @objc private func insertCommand() {
         let command: String
-        switch mode {
+        switch responseMode {
         case .command:
             command = responseText.trimmingCharacters(in: .whitespacesAndNewlines)
         case .diagnose:
