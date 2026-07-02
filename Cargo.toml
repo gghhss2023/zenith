@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/zenith-core",
+    "crates/zenith-render",
+    "crates/zenith-ffi",
+    "crates/zenith-config",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+zenith-core = { path = "crates/zenith-core" }
+zenith-render = { path = "crates/zenith-render" }
+zenith-config = { path = "crates/zenith-config" }

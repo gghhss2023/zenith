@@ -1,0 +1,11 @@
+[package]
+name = "zenith-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vte = "0.13"
+unicode-width = "0.2"
+log = "0.4"
+bitflags = "2"
+libc = "0.2"

@@ -1,0 +1,9 @@
+[package]
+name = "zenith-render"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+zenith-core = { workspace = true }
+cosmic-text = "0.12"
+log = "0.4"
