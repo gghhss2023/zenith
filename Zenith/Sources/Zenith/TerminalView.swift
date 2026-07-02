@@ -17,6 +17,8 @@ class TerminalMetalView: MTKView {
     private var selectionEnd: (col: Int, row: Int)?
     private var markedText: String = ""
     private var lastCursorRect: NSRect = .zero
+    private var aiPanel: AIPanel?
+    private var aiModel = "sonnet"
 
     override init(frame: CGRect, device: MTLDevice?) {
         super.init(frame: frame, device: device ?? MTLCreateSystemDefaultDevice())
@@ -78,6 +80,7 @@ class TerminalMetalView: MTKView {
 
         let config = zn_config_load()!
         terminal = zn_terminal_new(cols, rows, config.pointee.font_family, config.pointee.font_size * scale)
+        aiModel = String(cString: config.pointee.ai_model)
         zn_config_free(config)
 
         guard let terminal = terminal else {
@@ -167,6 +170,33 @@ class TerminalMetalView: MTKView {
         }
     }
 
+    func screenText() -> String {
+        guard let terminal = terminal else { return "" }
+        guard let cstr = zn_terminal_screen_text(terminal, 50) else { return "" }
+        let text = String(cString: cstr)
+        zn_string_free(cstr)
+        return text
+    }
+
+    func insertToPrompt(_ text: String) {
+        guard let terminal = terminal else { return }
+        // Newlines would execute intermediate lines - collapse to single line.
+        let clean = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let bytes = Array(clean.utf8)
+        bytes.withUnsafeBufferPointer { buf in
+            zn_terminal_write(terminal, buf.baseAddress, UInt32(buf.count))
+        }
+    }
+
+    private func toggleAIPanel() {
+        if aiPanel == nil {
+            aiPanel = AIPanel(terminalView: self, model: aiModel)
+        }
+        aiPanel?.toggle(over: window)
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.modifierFlags.contains(.command) else {
             return super.performKeyEquivalent(with: event)
@@ -175,6 +205,7 @@ class TerminalMetalView: MTKView {
         case "c": copySelection(); return true
         case "v": pasteClipboard(); return true
         case "q": NSApp.terminate(nil); return true
+        case "k": toggleAIPanel(); return true
         default: return super.performKeyEquivalent(with: event)
         }
     }
