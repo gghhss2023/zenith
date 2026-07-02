@@ -301,7 +301,8 @@ pub extern "C" fn zn_string_free(s: *mut c_char) {
 pub extern "C" fn zn_config_load() -> *mut ZNConfig {
     let config = zenith_config::Config::load();
     let family = CString::new(config.appearance.font_family.as_str()).unwrap();
-    let ai_model = CString::new(config.ai.model.as_str()).unwrap();
+    let ai_model = CString::new(config.ai.model.as_str())
+        .unwrap_or_else(|_| CString::new("sonnet").unwrap());
     let cfg = Box::new(ZNConfig {
         font_size: config.appearance.font_size,
         font_family: family.into_raw(),
