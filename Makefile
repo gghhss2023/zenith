@@ -1,7 +1,7 @@
 .PHONY: build run clean release
 
 build:
-	cargo build
+	cargo build --release
 	@echo "Rust build complete"
 	cd Zenith && swift build
 	@echo "Swift build complete"

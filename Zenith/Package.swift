@@ -16,13 +16,14 @@ let package = Package(
             exclude: ["Shaders.metal"],
             linkerSettings: [
                 .unsafeFlags([
-                    "-L", "../target/debug",
-                    "-lzenith_ffi",
-                    "-Xlinker", "-rpath", "-Xlinker", "@executable_path/../../../target/debug",
+                    "../target/release/libzenith_ffi.a",
                 ]),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
                 .linkedFramework("AppKit"),
+                .linkedFramework("CoreText"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("CoreFoundation"),
             ]
         ),
     ]
