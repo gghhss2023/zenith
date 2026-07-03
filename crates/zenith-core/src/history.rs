@@ -1,16 +1,35 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
 const MAX_ENTRIES: usize = 10_000;
+const RECENT_WINDOW: usize = 1_000;
+const MID_WINDOW: usize = 5_000;
+
+struct CommandStats {
+    score: f32,
+    last_index: usize,
+}
+
+fn weight(age: usize) -> f32 {
+    if age < RECENT_WINDOW {
+        1.0
+    } else if age < MID_WINDOW {
+        0.5
+    } else {
+        0.25
+    }
+}
 
 pub struct History {
     entries: Vec<String>,
+    stats: HashMap<String, CommandStats>,
     path: PathBuf,
 }
 
 impl History {
     pub fn load(path: PathBuf) -> Self {
-        let entries = fs::read_to_string(&path)
+        let entries: Vec<String> = fs::read_to_string(&path)
             .map(|s| {
                 s.lines()
                     .filter(|l| !l.trim().is_empty())
@@ -18,7 +37,26 @@ impl History {
                     .collect()
             })
             .unwrap_or_default();
-        Self { entries, path }
+        let stats = Self::build_stats(&entries);
+        Self { entries, stats, path }
+    }
+
+    fn build_stats(entries: &[String]) -> HashMap<String, CommandStats> {
+        let len = entries.len();
+        let mut stats: HashMap<String, CommandStats> = HashMap::new();
+        for (i, cmd) in entries.iter().enumerate() {
+            let w = weight(len - 1 - i);
+            match stats.get_mut(cmd) {
+                Some(s) => {
+                    s.score += w;
+                    s.last_index = i;
+                }
+                None => {
+                    stats.insert(cmd.clone(), CommandStats { score: w, last_index: i });
+                }
+            }
+        }
+        stats
     }
 
     pub fn default_path() -> PathBuf {
@@ -36,6 +74,7 @@ impl History {
             let excess = self.entries.len() - MAX_ENTRIES;
             self.entries.drain(..excess);
         }
+        self.stats = Self::build_stats(&self.entries);
         self.persist();
     }
 
@@ -45,11 +84,16 @@ impl History {
         if prefix.trim().is_empty() {
             return None;
         }
-        self.entries
+        self.stats
             .iter()
-            .rev()
-            .find(|e| e.starts_with(prefix) && e.as_str() != prefix)
-            .map(|s| s.as_str())
+            .filter(|(cmd, _)| cmd.starts_with(prefix) && cmd.as_str() != prefix)
+            .max_by(|(_, a), (_, b)| {
+                a.score
+                    .partial_cmp(&b.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then(a.last_index.cmp(&b.last_index))
+            })
+            .map(|(cmd, _)| cmd.as_str())
     }
 
     fn persist(&self) {
@@ -136,5 +180,42 @@ mod tests {
         assert_eq!(mode & 0o777, 0o600);
         let h2 = History::load(path);
         assert_eq!(h2.suggest("cargo"), Some("cargo test"));
+    }
+
+    #[test]
+    fn frequency_beats_recency() {
+        let mut h = History::load(temp_path("freq"));
+        h.append("git status");
+        h.append("git status");
+        h.append("git status");
+        h.append("git stash");
+        assert_eq!(h.suggest("git st"), Some("git status"));
+    }
+
+    #[test]
+    fn tie_breaks_by_recency() {
+        let mut h = History::load(temp_path("tie"));
+        h.append("foo bar");
+        h.append("foo baz");
+        assert_eq!(h.suggest("foo"), Some("foo baz"));
+    }
+
+    #[test]
+    fn old_occurrences_decay() {
+        let path = temp_path("decay");
+        let mut lines: Vec<String> = Vec::new();
+        for _ in 0..5 {
+            lines.push("make legacy".to_string());
+        }
+        for i in 0..5_000 {
+            lines.push(format!("filler {}", i));
+        }
+        lines.push("make check".to_string());
+        lines.push("make check".to_string());
+        fs::write(&path, lines.join("\n") + "\n").unwrap();
+        let h = History::load(path);
+        // legacy: 5 occurrences at age >= 5000 -> 5 * 0.25 = 1.25
+        // check:  2 occurrences at age < 1000  -> 2 * 1.0  = 2.0
+        assert_eq!(h.suggest("make"), Some("make check"));
     }
 }
