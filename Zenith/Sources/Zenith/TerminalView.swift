@@ -221,6 +221,18 @@ class TerminalMetalView: MTKView {
 
         let modifiers = event.modifierFlags
 
+        if event.keyCode == 124,
+           !modifiers.contains(.shift), !modifiers.contains(.control),
+           !modifiers.contains(.option), !modifiers.contains(.command),
+           let cstr = zn_terminal_accept_suggestion(terminal) {
+            let bytes = Array(String(cString: cstr).utf8)
+            zn_string_free(cstr)
+            bytes.withUnsafeBufferPointer { buf in
+                zn_terminal_write(terminal, buf.baseAddress, UInt32(buf.count))
+            }
+            return
+        }
+
         if let special = specialKeySequence(event) {
             special.withUnsafeBufferPointer { buf in
                 zn_terminal_write(terminal, buf.baseAddress, UInt32(buf.count))
