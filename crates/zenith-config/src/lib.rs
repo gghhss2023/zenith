@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
     pub appearance: Appearance,
@@ -23,16 +23,6 @@ pub struct Appearance {
 pub struct Terminal {
     pub scrollback_lines: usize,
     pub shell: Option<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            appearance: Appearance::default(),
-            terminal: Terminal::default(),
-            ai: Ai::default(),
-        }
-    }
 }
 
 impl Default for Appearance {

@@ -31,12 +31,10 @@ impl FontContext {
         let mut cell_width = font_size * 0.6;
         let cell_height = metrics.line_height;
 
-        for run in buffer.layout_runs() {
-            for glyph in run.glyphs.iter() {
+        if let Some(run) = buffer.layout_runs().next() {
+            if let Some(glyph) = run.glyphs.iter().next() {
                 cell_width = glyph.w;
-                break;
             }
-            break;
         }
 
         Self {
@@ -83,8 +81,8 @@ impl FontContext {
                     .swash_cache
                     .get_image(&mut self.font_system, physical.cache_key)
                 {
-                    let width = image.placement.width as u32;
-                    let height = image.placement.height as u32;
+                    let width = image.placement.width;
+                    let height = image.placement.height;
                     if width == 0 || height == 0 {
                         return None;
                     }

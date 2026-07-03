@@ -19,9 +19,10 @@ impl Pty {
     // forkpty deadlocks in multithreaded processes (dyld atfork lock vs Metal
     // worker threads), so the child must be created with posix_spawn instead.
     pub fn spawn(cols: u16, rows: u16, shell: Option<&str>) -> io::Result<Self> {
+        let _ = crate::shell_integration::ensure_installed();
         let shell = shell
             .map(String::from)
-            .unwrap_or_else(|| Self::detect_shell());
+            .unwrap_or_else(Self::detect_shell);
 
         let shell_cstr = CString::new(shell.as_str())
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid shell path"))?;
@@ -62,10 +63,13 @@ impl Pty {
         };
 
         let envs: Vec<CString> = std::env::vars()
-            .filter(|(k, _)| k != "TERM")
+            .filter(|(k, _)| k != "TERM" && k != "ZENITH_SHELL_INTEGRATION")
             .filter_map(|(k, v)| CString::new(format!("{}={}", k, v)).ok())
             .chain(std::iter::once(
                 CString::new("TERM=xterm-256color").unwrap(),
+            ))
+            .chain(std::iter::once(
+                CString::new("ZENITH_SHELL_INTEGRATION=1").unwrap(),
             ))
             .collect();
         let mut envp: Vec<*mut libc::c_char> =

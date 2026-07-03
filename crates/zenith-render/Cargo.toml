@@ -7,3 +7,4 @@ edition.workspace = true
 zenith-core = { workspace = true }
 cosmic-text = "0.12"
 log = "0.4"
+unicode-width = "0.2"

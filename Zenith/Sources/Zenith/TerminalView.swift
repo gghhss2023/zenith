@@ -37,9 +37,11 @@ class TerminalMetalView: MTKView {
         self.commandQueue = device.makeCommandQueue()
         self.colorPixelFormat = .bgra8Unorm
         self.clearColor = MTLClearColor(red: 0.102, green: 0.106, blue: 0.149, alpha: 1.0)
-        self.preferredFramesPerSecond = 120
-        self.isPaused = false
-        self.enableSetNeedsDisplay = false
+        // Draw on demand only. Continuous drawing floods the main queue with
+        // draw callbacks whenever the drawable pool stalls (each blocks ~1s in
+        // nextDrawable), starving keyboard/PTY event processing indefinitely.
+        self.isPaused = true
+        self.enableSetNeedsDisplay = true
 
         let library: MTLLibrary
         do {
@@ -98,6 +100,7 @@ class TerminalMetalView: MTKView {
         source.setEventHandler { [weak self] in
             guard let self = self, let term = self.terminal else { return }
             while zn_terminal_read(term) {}
+            self.needsDisplay = true
             if zn_terminal_child_exited(term) >= 0 {
                 self.readSource?.cancel()
                 self.window?.close()
@@ -125,6 +128,7 @@ class TerminalMetalView: MTKView {
     }
 
     private func clearSelection() {
+        if selectionStart != nil { needsDisplay = true }
         selectionStart = nil
         selectionEnd = nil
     }
@@ -140,11 +144,13 @@ class TerminalMetalView: MTKView {
         let cell = cellAt(event)
         selectionStart = cell
         selectionEnd = cell
+        needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard selectionStart != nil else { return }
         selectionEnd = cellAt(event)
+        needsDisplay = true
     }
 
     private func copySelection() {
@@ -220,6 +226,18 @@ class TerminalMetalView: MTKView {
         }
 
         let modifiers = event.modifierFlags
+
+        if event.keyCode == 124,
+           !modifiers.contains(.shift), !modifiers.contains(.control),
+           !modifiers.contains(.option), !modifiers.contains(.command),
+           let cstr = zn_terminal_accept_suggestion(terminal) {
+            let bytes = Array(String(cString: cstr).utf8)
+            zn_string_free(cstr)
+            bytes.withUnsafeBufferPointer { buf in
+                zn_terminal_write(terminal, buf.baseAddress, UInt32(buf.count))
+            }
+            return
+        }
 
         if let special = specialKeySequence(event) {
             special.withUnsafeBufferPointer { buf in
@@ -301,11 +319,13 @@ class TerminalMetalView: MTKView {
             if lines != 0 {
                 scrollAccumulator -= CGFloat(lines) * cellHeightPoints
                 zn_terminal_scroll_display(terminal, Int32(lines))
+                needsDisplay = true
             }
         } else {
             let lines = Int32(event.scrollingDeltaY.rounded())
             if lines != 0 {
                 zn_terminal_scroll_display(terminal, lines * 3)
+                needsDisplay = true
             }
         }
     }
@@ -350,13 +370,15 @@ class TerminalMetalView: MTKView {
             return
         }
 
-        if rd.bg_count > 0 {
+        // setVertexBytes is limited to 4KB; instance data can be far larger, so use MTLBuffers
+        if rd.bg_count > 0,
+           let bgBuffer = device.makeBuffer(
+               bytes: rd.bg_instances,
+               length: Int(rd.bg_count) * 32, // BgInstance = 2+2+4 floats = 32 bytes
+               options: .storageModeShared
+           ) {
             encoder.setRenderPipelineState(bgPipeline)
-            encoder.setVertexBytes(
-                rd.bg_instances,
-                length: Int(rd.bg_count) * 32, // BgInstance = 2+2+4 floats = 32 bytes
-                index: 0
-            )
+            encoder.setVertexBuffer(bgBuffer, offset: 0, index: 0)
             encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: Int(rd.bg_count))
         }
@@ -382,13 +404,14 @@ class TerminalMetalView: MTKView {
             }
         }
 
-        if rd.glyph_count > 0, let atlas = atlasTexture {
+        if rd.glyph_count > 0, let atlas = atlasTexture,
+           let glyphBuffer = device.makeBuffer(
+               bytes: rd.glyph_instances,
+               length: Int(rd.glyph_count) * 48, // GlyphInstance = 2+2+2+2+4 floats = 48 bytes
+               options: .storageModeShared
+           ) {
             encoder.setRenderPipelineState(glyphPipeline)
-            encoder.setVertexBytes(
-                rd.glyph_instances,
-                length: Int(rd.glyph_count) * 48, // GlyphInstance = 2+2+2+2+4 floats = 48 bytes
-                index: 0
-            )
+            encoder.setVertexBuffer(glyphBuffer, offset: 0, index: 0)
             encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
             encoder.setFragmentTexture(atlas, index: 0)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: Int(rd.glyph_count))
