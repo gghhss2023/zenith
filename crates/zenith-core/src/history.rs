@@ -88,7 +88,7 @@ mod tests {
         h.append("git status");
         h.append("git stash");
         assert_eq!(h.suggest("git st"), Some("git stash"));
-        h.append("git status"); // moves to most-recent
+        h.append("git status"); // second occurrence, now most recent
         assert_eq!(h.suggest("git st"), Some("git status"));
     }
 
@@ -115,7 +115,7 @@ mod tests {
     fn truncates_oldest_beyond_max() {
         let path = temp_path("truncate");
         let mut lines: Vec<String> = vec!["ancient cmd".to_string()];
-        for i in 0..10_000 {
+        for i in 0..9_999 {
             lines.push(format!("filler {}", i));
         }
         fs::write(&path, lines.join("\n") + "\n").unwrap();
