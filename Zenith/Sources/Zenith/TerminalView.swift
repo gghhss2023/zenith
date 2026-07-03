@@ -440,9 +440,23 @@ class TerminalMetalView: MTKView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if window != nil {
+        NotificationCenter.default.removeObserver(
+            self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
+        if let window = window {
             updateTerminalSize()
+            // Rendering while occluded starves the drawable pool: nextDrawable
+            // blocks ~1s per frame on the main thread and input stalls
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(occlusionStateChanged),
+                name: NSWindow.didChangeOcclusionStateNotification,
+                object: window
+            )
         }
+    }
+
+    @objc private func occlusionStateChanged() {
+        isPaused = !(window?.occlusionState.contains(.visible) ?? false)
     }
 
     private func updateTerminalSize() {
