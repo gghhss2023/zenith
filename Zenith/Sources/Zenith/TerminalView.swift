@@ -362,13 +362,15 @@ class TerminalMetalView: MTKView {
             return
         }
 
-        if rd.bg_count > 0 {
+        // setVertexBytes is limited to 4KB; instance data can be far larger, so use MTLBuffers
+        if rd.bg_count > 0,
+           let bgBuffer = device.makeBuffer(
+               bytes: rd.bg_instances,
+               length: Int(rd.bg_count) * 32, // BgInstance = 2+2+4 floats = 32 bytes
+               options: .storageModeShared
+           ) {
             encoder.setRenderPipelineState(bgPipeline)
-            encoder.setVertexBytes(
-                rd.bg_instances,
-                length: Int(rd.bg_count) * 32, // BgInstance = 2+2+4 floats = 32 bytes
-                index: 0
-            )
+            encoder.setVertexBuffer(bgBuffer, offset: 0, index: 0)
             encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: Int(rd.bg_count))
         }
@@ -394,13 +396,14 @@ class TerminalMetalView: MTKView {
             }
         }
 
-        if rd.glyph_count > 0, let atlas = atlasTexture {
+        if rd.glyph_count > 0, let atlas = atlasTexture,
+           let glyphBuffer = device.makeBuffer(
+               bytes: rd.glyph_instances,
+               length: Int(rd.glyph_count) * 48, // GlyphInstance = 2+2+2+2+4 floats = 48 bytes
+               options: .storageModeShared
+           ) {
             encoder.setRenderPipelineState(glyphPipeline)
-            encoder.setVertexBytes(
-                rd.glyph_instances,
-                length: Int(rd.glyph_count) * 48, // GlyphInstance = 2+2+2+2+4 floats = 48 bytes
-                index: 0
-            )
+            encoder.setVertexBuffer(glyphBuffer, offset: 0, index: 0)
             encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
             encoder.setFragmentTexture(atlas, index: 0)
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: Int(rd.glyph_count))
