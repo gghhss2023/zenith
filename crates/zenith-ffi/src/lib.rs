@@ -168,6 +168,7 @@ pub extern "C" fn zn_terminal_render(
         show_cursor,
         viewport_width,
         viewport_height,
+        None,
     );
 
     // Safety: BgInstance/GlyphInstance/CursorInstance in FFI and render crates

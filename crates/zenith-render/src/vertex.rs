@@ -35,6 +35,9 @@ pub struct RenderOutput {
     pub cursor: Option<CursorInstance>,
 }
 
+pub const GHOST_TEXT_COLOR: [f32; 4] = [0.31, 0.31, 0.33, 1.0];
+
+#[allow(clippy::too_many_arguments)]
 pub fn generate_render_data(
     grid: &Grid,
     font_ctx: &mut FontContext,
@@ -43,6 +46,7 @@ pub fn generate_render_data(
     show_cursor: bool,
     _viewport_width: f32,
     _viewport_height: f32,
+    suggestion: Option<&str>,
 ) -> RenderOutput {
     let cell_w = font_ctx.cell_width;
     let cell_h = font_ctx.cell_height;
@@ -99,6 +103,47 @@ pub fn generate_render_data(
         }
     }
 
+    if let Some(sug) = suggestion {
+        if grid.display_offset() == 0 {
+            let mut col = cursor.0;
+            let row = cursor.1;
+            let y = row as f32 * cell_h;
+            for c in sug.chars() {
+                let width = unicode_width::UnicodeWidthChar::width(c).unwrap_or(1);
+                if width == 0 || col + width > grid.cols() {
+                    if width == 0 {
+                        continue;
+                    }
+                    break;
+                }
+                if c != ' ' {
+                    let key = GlyphKey {
+                        c,
+                        bold: false,
+                        italic: false,
+                    };
+                    if let Some(entry) = atlas.get_or_insert(key, font_ctx) {
+                        let x = col as f32 * cell_w;
+                        glyph_instances.push(GlyphInstance {
+                            position: [
+                                x + entry.bearing_x,
+                                y + (font_ctx.baseline - entry.bearing_y),
+                            ],
+                            size: [entry.width as f32, entry.height as f32],
+                            tex_offset: [entry.x as f32 / atlas_w, entry.y as f32 / atlas_h],
+                            tex_size: [
+                                entry.width as f32 / atlas_w,
+                                entry.height as f32 / atlas_h,
+                            ],
+                            color: GHOST_TEXT_COLOR,
+                        });
+                    }
+                }
+                col += width;
+            }
+        }
+    }
+
     let cursor_inst = if show_cursor && grid.display_offset() == 0 {
         let cx = cursor.0 as f32 * cell_w;
         let cy = cursor.1 as f32 * cell_h;
@@ -115,5 +160,67 @@ pub fn generate_render_data(
         bg_instances,
         glyph_instances,
         cursor: cursor_inst,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup() -> (Grid, FontContext, GlyphAtlas) {
+        (
+            Grid::new(20, 5, 100),
+            FontContext::new("Menlo", 12.0),
+            GlyphAtlas::new(512, 512),
+        )
+    }
+
+    #[test]
+    fn ghost_text_renders_dim_at_cursor() {
+        let (grid, mut font_ctx, mut atlas) = setup();
+        let out = generate_render_data(
+            &grid, &mut font_ctx, &mut atlas, (3, 0), true, 0.0, 0.0, Some("ls"),
+        );
+        // empty grid → the only glyphs are the 2 ghost chars
+        assert_eq!(out.glyph_instances.len(), 2);
+        assert!(out
+            .glyph_instances
+            .iter()
+            .all(|g| g.color == GHOST_TEXT_COLOR));
+        // first ghost glyph sits in the cursor column
+        let cell_w = font_ctx.cell_width;
+        assert!(out.glyph_instances[0].position[0] >= 3.0 * cell_w);
+        assert!(out.glyph_instances[0].position[0] < 4.0 * cell_w);
+    }
+
+    #[test]
+    fn ghost_text_clipped_at_row_end() {
+        let (grid, mut font_ctx, mut atlas) = setup();
+        let out = generate_render_data(
+            &grid, &mut font_ctx, &mut atlas, (18, 0), true, 0.0, 0.0, Some("abcdef"),
+        );
+        assert_eq!(out.glyph_instances.len(), 2); // cols 18,19 only
+    }
+
+    #[test]
+    fn ghost_text_hidden_while_scrolled() {
+        let (mut grid, mut font_ctx, mut atlas) = setup();
+        // create scrollback then scroll up
+        for _ in 0..3 {
+            grid.scroll_up(0, 4, 1);
+        }
+        grid.scroll_display(2);
+        let out = generate_render_data(
+            &grid, &mut font_ctx, &mut atlas, (0, 0), true, 0.0, 0.0, Some("ls"),
+        );
+        assert_eq!(out.glyph_instances.len(), 0);
+    }
+
+    #[test]
+    fn no_suggestion_no_ghost() {
+        let (grid, mut font_ctx, mut atlas) = setup();
+        let out =
+            generate_render_data(&grid, &mut font_ctx, &mut atlas, (0, 0), true, 0.0, 0.0, None);
+        assert_eq!(out.glyph_instances.len(), 0);
     }
 }
