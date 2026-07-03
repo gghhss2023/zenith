@@ -37,9 +37,11 @@ class TerminalMetalView: MTKView {
         self.commandQueue = device.makeCommandQueue()
         self.colorPixelFormat = .bgra8Unorm
         self.clearColor = MTLClearColor(red: 0.102, green: 0.106, blue: 0.149, alpha: 1.0)
-        self.preferredFramesPerSecond = 120
-        self.isPaused = false
-        self.enableSetNeedsDisplay = false
+        // Draw on demand only. Continuous drawing floods the main queue with
+        // draw callbacks whenever the drawable pool stalls (each blocks ~1s in
+        // nextDrawable), starving keyboard/PTY event processing indefinitely.
+        self.isPaused = true
+        self.enableSetNeedsDisplay = true
 
         let library: MTLLibrary
         do {
@@ -98,6 +100,7 @@ class TerminalMetalView: MTKView {
         source.setEventHandler { [weak self] in
             guard let self = self, let term = self.terminal else { return }
             while zn_terminal_read(term) {}
+            self.needsDisplay = true
             if zn_terminal_child_exited(term) >= 0 {
                 self.readSource?.cancel()
                 self.window?.close()
@@ -125,6 +128,7 @@ class TerminalMetalView: MTKView {
     }
 
     private func clearSelection() {
+        if selectionStart != nil { needsDisplay = true }
         selectionStart = nil
         selectionEnd = nil
     }
@@ -140,11 +144,13 @@ class TerminalMetalView: MTKView {
         let cell = cellAt(event)
         selectionStart = cell
         selectionEnd = cell
+        needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard selectionStart != nil else { return }
         selectionEnd = cellAt(event)
+        needsDisplay = true
     }
 
     private func copySelection() {
@@ -313,11 +319,13 @@ class TerminalMetalView: MTKView {
             if lines != 0 {
                 scrollAccumulator -= CGFloat(lines) * cellHeightPoints
                 zn_terminal_scroll_display(terminal, Int32(lines))
+                needsDisplay = true
             }
         } else {
             let lines = Int32(event.scrollingDeltaY.rounded())
             if lines != 0 {
                 zn_terminal_scroll_display(terminal, lines * 3)
+                needsDisplay = true
             }
         }
     }
@@ -440,23 +448,9 @@ class TerminalMetalView: MTKView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        NotificationCenter.default.removeObserver(
-            self, name: NSWindow.didChangeOcclusionStateNotification, object: nil)
-        if let window = window {
+        if window != nil {
             updateTerminalSize()
-            // Rendering while occluded starves the drawable pool: nextDrawable
-            // blocks ~1s per frame on the main thread and input stalls
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(occlusionStateChanged),
-                name: NSWindow.didChangeOcclusionStateNotification,
-                object: window
-            )
         }
-    }
-
-    @objc private func occlusionStateChanged() {
-        isPaused = !(window?.occlusionState.contains(.visible) ?? false)
     }
 
     private func updateTerminalSize() {
