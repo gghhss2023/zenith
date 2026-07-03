@@ -12,6 +12,8 @@ class TerminalMetalView: MTKView {
     var readSource: DispatchSourceRead?
     var cellWidth: Float = 8.4
     var cellHeight: Float = 16.8
+    private var baseFontSize: Float = 13
+    private var currentFontSize: Float = 13
     private var scrollAccumulator: CGFloat = 0
     private var selectionStart: (col: Int, row: Int)?
     private var selectionEnd: (col: Int, row: Int)?
@@ -82,6 +84,8 @@ class TerminalMetalView: MTKView {
 
         let config = zn_config_load()!
         terminal = zn_terminal_new(cols, rows, config.pointee.font_family, config.pointee.font_size * scale)
+        baseFontSize = config.pointee.font_size
+        currentFontSize = baseFontSize
         aiModel = String(cString: config.pointee.ai_model)
         zn_config_free(config)
 
@@ -207,6 +211,35 @@ class TerminalMetalView: MTKView {
     @objc func paste(_ sender: Any?) { pasteClipboard() }
     @objc func toggleAI(_ sender: Any?) { toggleAIPanel() }
 
+    @objc func increaseFontSize(_ sender: Any?) { setFontSize(currentFontSize + 1) }
+    @objc func decreaseFontSize(_ sender: Any?) { setFontSize(currentFontSize - 1) }
+    @objc func resetFontSize(_ sender: Any?) { setFontSize(baseFontSize) }
+
+    private func setFontSize(_ size: Float) {
+        guard let terminal = terminal else { return }
+        let clamped = min(max(size, 6), 72)
+        guard clamped != currentFontSize else { return }
+        currentFontSize = clamped
+        let scale = Float(self.window?.backingScaleFactor ?? 2.0)
+        zn_terminal_set_font_size(terminal, clamped * scale)
+        var w: Float = 0
+        var h: Float = 0
+        zn_terminal_cell_size(terminal, &w, &h)
+        cellWidth = w
+        cellHeight = h
+        updateTerminalSize()
+        needsDisplay = true
+    }
+
+    override func selectAll(_ sender: Any?) {
+        let scale = Float(self.window?.backingScaleFactor ?? 2.0)
+        let cols = max(Int(Float(bounds.width) * scale / cellWidth), 1)
+        let rows = max(Int(Float(bounds.height) * scale / cellHeight), 1)
+        selectionStart = (0, 0)
+        selectionEnd = (cols - 1, rows - 1)
+        needsDisplay = true
+    }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.modifierFlags.contains(.command) else {
             return super.performKeyEquivalent(with: event)
@@ -216,6 +249,10 @@ class TerminalMetalView: MTKView {
         case "v": pasteClipboard(); return true
         case "q": NSApp.terminate(nil); return true
         case "k": toggleAIPanel(); return true
+        case "a": selectAll(nil); return true
+        case "+", "=": increaseFontSize(nil); return true
+        case "-": decreaseFontSize(nil); return true
+        case "0": resetFontSize(nil); return true
         default: return super.performKeyEquivalent(with: event)
         }
     }

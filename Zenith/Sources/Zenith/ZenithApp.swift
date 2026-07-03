@@ -74,6 +74,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             title: "About Zenith",
             action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
         appMenu.addItem(.separator())
+        let servicesItem = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
+        let servicesMenu = NSMenu(title: "Services")
+        servicesItem.submenu = servicesMenu
+        appMenu.addItem(servicesItem)
+        appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(
             title: "Hide Zenith", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
         let hideOthers = NSMenuItem(
@@ -105,6 +110,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             title: "Copy", action: #selector(TerminalMetalView.copy(_:)), keyEquivalent: "c"))
         editMenu.addItem(NSMenuItem(
             title: "Paste", action: #selector(TerminalMetalView.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(.separator())
+        editMenu.addItem(NSMenuItem(
+            title: "Select All", action: #selector(NSResponder.selectAll(_:)), keyEquivalent: "a"))
 
         let viewItem = NSMenuItem()
         main.addItem(viewItem)
@@ -112,6 +120,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         viewItem.submenu = viewMenu
         viewMenu.addItem(NSMenuItem(
             title: "AI Panel", action: #selector(TerminalMetalView.toggleAI(_:)), keyEquivalent: "k"))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(NSMenuItem(
+            title: "Increase Font Size",
+            action: #selector(TerminalMetalView.increaseFontSize(_:)), keyEquivalent: "+"))
+        viewMenu.addItem(NSMenuItem(
+            title: "Decrease Font Size",
+            action: #selector(TerminalMetalView.decreaseFontSize(_:)), keyEquivalent: "-"))
+        viewMenu.addItem(NSMenuItem(
+            title: "Reset Font Size",
+            action: #selector(TerminalMetalView.resetFontSize(_:)), keyEquivalent: "0"))
+        viewMenu.addItem(.separator())
         let fullScreen = NSMenuItem(
             title: "Enter Full Screen",
             action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
@@ -126,6 +145,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
         windowMenu.addItem(NSMenuItem(
             title: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: ""))
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(NSMenuItem(
+            title: "Bring All to Front",
+            action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: ""))
 
         let helpItem = NSMenuItem()
         main.addItem(helpItem)
@@ -136,6 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(AppDelegate.openGitHub(_:)), keyEquivalent: ""))
 
         NSApp.mainMenu = main
+        NSApp.servicesMenu = servicesMenu
         NSApp.windowsMenu = windowMenu
         NSApp.helpMenu = helpMenu
     }
