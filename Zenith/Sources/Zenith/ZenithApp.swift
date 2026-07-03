@@ -88,6 +88,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(NSMenuItem(
             title: "Quit Zenith", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
+        let shellItem = NSMenuItem()
+        main.addItem(shellItem)
+        let shellMenu = NSMenu(title: "Shell")
+        shellItem.submenu = shellMenu
+        shellMenu.addItem(NSMenuItem(
+            title: "New Window", action: #selector(AppDelegate.newWindow(_:)), keyEquivalent: "n"))
+        shellMenu.addItem(NSMenuItem(
+            title: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+
         let editItem = NSMenuItem()
         main.addItem(editItem)
         let editMenu = NSMenu(title: "Edit")
@@ -96,9 +105,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             title: "Copy", action: #selector(TerminalMetalView.copy(_:)), keyEquivalent: "c"))
         editMenu.addItem(NSMenuItem(
             title: "Paste", action: #selector(TerminalMetalView.paste(_:)), keyEquivalent: "v"))
-        editMenu.addItem(.separator())
-        editMenu.addItem(NSMenuItem(
+
+        let viewItem = NSMenuItem()
+        main.addItem(viewItem)
+        let viewMenu = NSMenu(title: "View")
+        viewItem.submenu = viewMenu
+        viewMenu.addItem(NSMenuItem(
             title: "AI Panel", action: #selector(TerminalMetalView.toggleAI(_:)), keyEquivalent: "k"))
+        let fullScreen = NSMenuItem(
+            title: "Enter Full Screen",
+            action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
+        fullScreen.keyEquivalentModifierMask = [.command, .control]
+        viewMenu.addItem(fullScreen)
 
         let windowItem = NSMenuItem()
         main.addItem(windowItem)
@@ -109,7 +127,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowMenu.addItem(NSMenuItem(
             title: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: ""))
 
+        let helpItem = NSMenuItem()
+        main.addItem(helpItem)
+        let helpMenu = NSMenu(title: "Help")
+        helpItem.submenu = helpMenu
+        helpMenu.addItem(NSMenuItem(
+            title: "Zenith on GitHub",
+            action: #selector(AppDelegate.openGitHub(_:)), keyEquivalent: ""))
+
         NSApp.mainMenu = main
         NSApp.windowsMenu = windowMenu
+        NSApp.helpMenu = helpMenu
+    }
+
+    @objc func newWindow(_ sender: Any?) {
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config)
+    }
+
+    @objc func openGitHub(_ sender: Any?) {
+        NSWorkspace.shared.open(URL(string: "https://github.com/gghhss2023/zenith")!)
     }
 }
