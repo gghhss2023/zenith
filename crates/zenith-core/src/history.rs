@@ -31,7 +31,6 @@ impl History {
         if command.is_empty() {
             return;
         }
-        self.entries.retain(|e| e != command);
         self.entries.push(command.to_string());
         if self.entries.len() > MAX_ENTRIES {
             let excess = self.entries.len() - MAX_ENTRIES;
@@ -104,12 +103,26 @@ mod tests {
     }
 
     #[test]
-    fn append_dedups_and_ignores_empty() {
-        let mut h = History::load(temp_path("dedup"));
+    fn append_keeps_duplicates_and_ignores_empty() {
+        let mut h = History::load(temp_path("log"));
         h.append("make build");
         h.append("  ");
         h.append("make build");
-        assert_eq!(h.entries.len(), 1);
+        assert_eq!(h.entries.len(), 2);
+    }
+
+    #[test]
+    fn truncates_oldest_beyond_max() {
+        let path = temp_path("truncate");
+        let mut lines: Vec<String> = vec!["ancient cmd".to_string()];
+        for i in 0..10_000 {
+            lines.push(format!("filler {}", i));
+        }
+        fs::write(&path, lines.join("\n") + "\n").unwrap();
+        let mut h = History::load(path);
+        h.append("new cmd");
+        assert_eq!(h.entries.len(), MAX_ENTRIES);
+        assert_eq!(h.suggest("ancient"), None);
     }
 
     #[test]
