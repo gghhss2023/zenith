@@ -61,6 +61,7 @@ void zn_terminal_destroy(ZenithTerminal *term);
 bool zn_terminal_read(ZenithTerminal *term);
 void zn_terminal_write(ZenithTerminal *term, const uint8_t *data, uint32_t len);
 void zn_terminal_resize(ZenithTerminal *term, uint32_t cols, uint32_t rows);
+void zn_terminal_set_font_size(ZenithTerminal *term, float font_size);
 int32_t zn_terminal_pty_fd(ZenithTerminal *term);
 ZNRenderData *zn_terminal_render(ZenithTerminal *term,
                                   float viewport_width, float viewport_height);

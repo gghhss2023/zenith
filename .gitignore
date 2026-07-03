@@ -1,3 +1,4 @@
 /target
 Zenith/.build
 .DS_Store
+dist/

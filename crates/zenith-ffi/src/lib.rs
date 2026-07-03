@@ -148,6 +148,16 @@ pub extern "C" fn zn_terminal_resize(term: *mut ZenithTerminal, cols: u32, rows:
 }
 
 #[no_mangle]
+pub extern "C" fn zn_terminal_set_font_size(term: *mut ZenithTerminal, font_size: f32) {
+    let term = unsafe { &mut *term };
+    let family = term.font_ctx.font_family.clone();
+    term.font_ctx = FontContext::new(&family, font_size);
+    let mut atlas = GlyphAtlas::new(2048, 2048);
+    atlas.warm_ascii(&mut term.font_ctx);
+    term.atlas = atlas;
+}
+
+#[no_mangle]
 pub extern "C" fn zn_terminal_pty_fd(term: *mut ZenithTerminal) -> i32 {
     let term = unsafe { &*term };
     term.pty.fd()
