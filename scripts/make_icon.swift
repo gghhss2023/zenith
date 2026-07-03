@@ -27,7 +27,8 @@ image.unlockFocus()
 
 guard let tiff = image.tiffRepresentation,
       let rep = NSBitmapImageRep(data: tiff),
-      let png = rep.representation(using: .png, properties: [:]) else {
+      let srgb = rep.converting(to: .sRGB, renderingIntent: .default),
+      let png = srgb.representation(using: .png, properties: [:]) else {
     fatalError("failed to render icon")
 }
 try! png.write(to: URL(fileURLWithPath: "dist/icon_1024.png"))
