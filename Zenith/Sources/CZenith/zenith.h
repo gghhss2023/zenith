@@ -74,6 +74,7 @@ char *zn_terminal_selection_text(ZenithTerminal *term,
                                  uint32_t end_col, uint32_t end_row);
 void zn_string_free(char *s);
 char *zn_terminal_screen_text(ZenithTerminal *term, uint32_t scrollback_lines);
+char *zn_terminal_accept_suggestion(ZenithTerminal *term);
 
 ZNConfig *zn_config_load(void);
 void zn_config_free(ZNConfig *cfg);

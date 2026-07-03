@@ -2,6 +2,7 @@
 #![allow(clippy::manual_unwrap_or)]
 use std::ffi::{c_char, CString};
 
+use zenith_core::history::History;
 use zenith_core::pty::Pty;
 use zenith_core::term::Terminal;
 use zenith_render::atlas::GlyphAtlas;
@@ -39,6 +40,7 @@ pub struct ZenithTerminal {
     pty: Pty,
     font_ctx: FontContext,
     atlas: GlyphAtlas,
+    history: History,
 }
 
 #[no_mangle]
@@ -78,6 +80,7 @@ pub extern "C" fn zn_terminal_new(
         pty,
         font_ctx,
         atlas,
+        history: History::load(History::default_path()),
     });
 
     Box::into_raw(terminal)
@@ -100,6 +103,9 @@ pub extern "C" fn zn_terminal_read(term: *mut ZenithTerminal) -> bool {
         Ok(0) => false,
         Ok(n) => {
             term.term.feed(&buf[..n]);
+            while let Some(cmd) = term.term.take_completed_command() {
+                term.history.append(&cmd);
+            }
             true
         }
         Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => false,
@@ -160,6 +166,12 @@ pub extern "C" fn zn_terminal_render(
     let cursor = term.term.cursor();
     let show_cursor = term.term.show_cursor();
 
+    let ghost: Option<String> = term.term.current_input().and_then(|input| {
+        term.history
+            .suggest(&input)
+            .map(|full| full[input.len()..].to_string())
+    });
+
     let output = generate_render_data(
         term.term.grid(),
         &mut term.font_ctx,
@@ -168,7 +180,7 @@ pub extern "C" fn zn_terminal_render(
         show_cursor,
         viewport_width,
         viewport_height,
-        None,
+        ghost.as_deref(),
     );
 
     // Safety: BgInstance/GlyphInstance/CursorInstance in FFI and render crates
@@ -291,6 +303,28 @@ pub extern "C" fn zn_terminal_screen_text(
         return std::ptr::null_mut();
     }
     CString::new(text).unwrap_or_default().into_raw()
+}
+
+#[no_mangle]
+pub extern "C" fn zn_terminal_accept_suggestion(term: *mut ZenithTerminal) -> *mut c_char {
+    if term.is_null() {
+        return std::ptr::null_mut();
+    }
+    let term = unsafe { &mut *term };
+    let input = match term.term.current_input() {
+        Some(i) => i,
+        None => return std::ptr::null_mut(),
+    };
+    let remainder = match term.history.suggest(&input) {
+        Some(full) => full[input.len()..].to_string(),
+        None => return std::ptr::null_mut(),
+    };
+    if remainder.is_empty() {
+        return std::ptr::null_mut();
+    }
+    CString::new(remainder)
+        .map(|s| s.into_raw())
+        .unwrap_or(std::ptr::null_mut())
 }
 
 #[no_mangle]
