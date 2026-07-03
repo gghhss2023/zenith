@@ -2,6 +2,14 @@ use crate::cell::{CellAttrs, Color, ANSI_COLORS, DEFAULT_BG, DEFAULT_FG};
 use crate::grid::Grid;
 use vte::{Params, Parser, Perform};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ShellState {
+    Ground,
+    Prompt,
+    Input,
+    Running,
+}
+
 struct TerminalState {
     grid: Grid,
     alt_grid: Option<Grid>,
@@ -20,6 +28,10 @@ struct TerminalState {
     auto_wrap: bool,
     pending_wrap: bool,
     last_char: Option<char>,
+    shell_state: ShellState,
+    input_start: Option<(usize, usize)>,
+    pending_command: Option<String>,
+    completed_commands: Vec<String>,
 }
 
 pub struct Terminal {
@@ -48,6 +60,10 @@ impl Terminal {
                 auto_wrap: true,
                 pending_wrap: false,
                 last_char: None,
+                shell_state: ShellState::Ground,
+                input_start: None,
+                pending_command: None,
+                completed_commands: Vec::new(),
             },
             parser: Parser::new(),
         }
@@ -100,6 +116,30 @@ impl Terminal {
 
     pub fn reset_display_offset(&mut self) {
         self.state.grid.reset_display_offset();
+    }
+
+    pub fn current_input(&self) -> Option<String> {
+        if self.state.shell_state != ShellState::Input {
+            return None;
+        }
+        let (col, abs_row) = self.state.input_start?;
+        for c in self.state.cursor_col..self.state.grid.cols() {
+            let cell = self.state.grid.cell(c, self.state.cursor_row);
+            if cell.width != 0 && cell.c != ' ' && cell.c != '\0' {
+                return None;
+            }
+        }
+        let cur_abs = self.state.grid.scrollback_len() + self.state.cursor_row;
+        self.state
+            .extract_text(col, abs_row, self.state.cursor_col, cur_abs)
+    }
+
+    pub fn take_completed_command(&mut self) -> Option<String> {
+        if self.state.completed_commands.is_empty() {
+            None
+        } else {
+            Some(self.state.completed_commands.remove(0))
+        }
     }
 }
 
@@ -178,6 +218,81 @@ impl TerminalState {
         }
     }
 
+    fn handle_shell_marker(&mut self, param: &[u8]) {
+        match param.first() {
+            Some(b'A') => {
+                self.shell_state = ShellState::Prompt;
+                self.input_start = None;
+            }
+            Some(b'B') => {
+                self.shell_state = ShellState::Input;
+                self.input_start =
+                    Some((self.cursor_col, self.grid.scrollback_len() + self.cursor_row));
+            }
+            Some(b'C') => {
+                if let Some((col, abs_row)) = self.input_start {
+                    let end_abs = self.grid.scrollback_len() + self.cursor_row;
+                    self.pending_command =
+                        self.extract_text(col, abs_row, self.cursor_col, end_abs);
+                }
+                self.shell_state = ShellState::Running;
+                self.input_start = None;
+            }
+            Some(b'D') => {
+                if let Some(cmd) = self.pending_command.take() {
+                    let cmd = cmd.trim().to_string();
+                    if !cmd.is_empty() {
+                        self.completed_commands.push(cmd);
+                    }
+                }
+                self.shell_state = ShellState::Ground;
+                self.input_start = None;
+            }
+            _ => {}
+        }
+    }
+
+    // Positions are (col, abs_row) where abs_row = scrollback_len + screen_row.
+    // end_col is exclusive. Returns None if the start row scrolled out of the grid.
+    fn extract_text(
+        &self,
+        start_col: usize,
+        start_abs_row: usize,
+        end_col: usize,
+        end_abs_row: usize,
+    ) -> Option<String> {
+        let sb = self.grid.scrollback_len();
+        if start_abs_row < sb || end_abs_row < start_abs_row {
+            return None;
+        }
+        let mut text = String::new();
+        for abs_row in start_abs_row..=end_abs_row {
+            let row = abs_row - sb;
+            if row >= self.grid.rows() {
+                break;
+            }
+            let from = if abs_row == start_abs_row { start_col } else { 0 };
+            let to = if abs_row == end_abs_row {
+                end_col.min(self.grid.cols())
+            } else {
+                self.grid.cols()
+            };
+            let mut line = String::new();
+            for col in from..to {
+                let cell = self.grid.cell(col, row);
+                if cell.width != 0 {
+                    line.push(cell.c);
+                }
+            }
+            if abs_row == end_abs_row {
+                text.push_str(&line);
+            } else {
+                text.push_str(line.trim_end());
+            }
+        }
+        Some(text)
+    }
+
     fn parse_color_from_params(params: &[u16], idx: &mut usize) -> Option<Color> {
         if *idx >= params.len() {
             return None;
@@ -237,11 +352,9 @@ impl Perform for TerminalState {
                 let next_tab = (self.cursor_col / 8 + 1) * 8;
                 self.cursor_col = next_tab.min(self.grid.cols() - 1);
             }
-            0x08 => {
-                if self.cursor_col > 0 {
-                    self.cursor_col -= 1;
-                    self.pending_wrap = false;
-                }
+            0x08 if self.cursor_col > 0 => {
+                self.cursor_col -= 1;
+                self.pending_wrap = false;
             }
             _ => {}
         }
@@ -265,6 +378,9 @@ impl Perform for TerminalState {
                 if params.len() > 1 {
                     self.cwd = String::from_utf8_lossy(params[1]).into();
                 }
+            }
+            b"133" if params.len() > 1 => {
+                self.handle_shell_marker(params[1]);
             }
             _ => {}
         }
@@ -587,5 +703,60 @@ mod tests {
         assert_eq!(term.grid().screen_text(50), "one\ntwo\nthree\nfour");
         // scrollback limited to last 1 line
         assert_eq!(term.grid().screen_text(1), "two\nthree\nfour");
+    }
+
+    #[test]
+    fn osc133_captures_completed_command() {
+        let mut t = Terminal::new(40, 5);
+        t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07ls -la\r\n\x1b]133;C\x07output\r\n\x1b]133;D;0\x07");
+        assert_eq!(t.take_completed_command(), Some("ls -la".to_string()));
+        assert_eq!(t.take_completed_command(), None);
+    }
+
+    #[test]
+    fn osc133_d_without_c_records_nothing() {
+        let mut t = Terminal::new(40, 5);
+        t.feed(b"\x1b]133;D;0\x07\x1b]133;A\x07$ ");
+        assert_eq!(t.take_completed_command(), None);
+    }
+
+    #[test]
+    fn current_input_tracks_typed_text() {
+        let mut t = Terminal::new(40, 5);
+        t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07git sta");
+        assert_eq!(t.current_input(), Some("git sta".to_string()));
+    }
+
+    #[test]
+    fn current_input_preserves_trailing_space() {
+        let mut t = Terminal::new(40, 5);
+        t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07git ");
+        assert_eq!(t.current_input(), Some("git ".to_string()));
+    }
+
+    #[test]
+    fn current_input_none_outside_input_state() {
+        let mut t = Terminal::new(40, 5);
+        assert_eq!(t.current_input(), None);
+        t.feed(b"\x1b]133;A\x07$ ");
+        assert_eq!(t.current_input(), None);
+        t.feed(b"\x1b]133;B\x07make\r\n\x1b]133;C\x07");
+        assert_eq!(t.current_input(), None); // Running state
+    }
+
+    #[test]
+    fn current_input_none_when_text_right_of_cursor() {
+        let mut t = Terminal::new(40, 5);
+        // type "git status", then cursor-left 4 → "atus" sits right of cursor
+        t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07git status\x1b[4D");
+        assert_eq!(t.current_input(), None);
+    }
+
+    #[test]
+    fn osc133_command_captured_after_scroll() {
+        let mut t = Terminal::new(20, 3);
+        t.feed(b"x\r\ny\r\n"); // prompt lands on bottom row
+        t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07echo hi\r\n\x1b]133;C\x07hi\r\n\x1b]133;D;0\x07");
+        assert_eq!(t.take_completed_command(), Some("echo hi".to_string()));
     }
 }

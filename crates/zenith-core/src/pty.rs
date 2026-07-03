@@ -21,7 +21,7 @@ impl Pty {
     pub fn spawn(cols: u16, rows: u16, shell: Option<&str>) -> io::Result<Self> {
         let shell = shell
             .map(String::from)
-            .unwrap_or_else(|| Self::detect_shell());
+            .unwrap_or_else(Self::detect_shell);
 
         let shell_cstr = CString::new(shell.as_str())
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "invalid shell path"))?;
