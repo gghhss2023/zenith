@@ -124,7 +124,20 @@ pub extern "C" fn zn_terminal_write(term: *mut ZenithTerminal, data: *const u8, 
 #[no_mangle]
 pub extern "C" fn zn_terminal_scroll_display(term: *mut ZenithTerminal, delta: i32) {
     let term = unsafe { &mut *term };
-    term.term.scroll_display(delta);
+    if term.term.is_alt_screen() {
+        if delta == 0 {
+            return;
+        }
+        let seq: &[u8] = if delta > 0 { b"\x1b[A" } else { b"\x1b[B" };
+        let n = delta.unsigned_abs() as usize;
+        let mut buf = Vec::with_capacity(seq.len() * n);
+        for _ in 0..n {
+            buf.extend_from_slice(seq);
+        }
+        let _ = term.pty.write_all(&buf);
+    } else {
+        term.term.scroll_display(delta);
+    }
 }
 
 #[no_mangle]
