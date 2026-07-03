@@ -205,6 +205,8 @@ impl TerminalState {
     }
 
     fn enter_alt_screen(&mut self) {
+        self.shell_state = ShellState::Ground;
+        self.input_start = None;
         let cols = self.grid.cols();
         let rows = self.grid.rows();
         let main = std::mem::replace(&mut self.grid, Grid::new(cols, rows, 0));
@@ -749,6 +751,15 @@ mod tests {
         let mut t = Terminal::new(40, 5);
         // type "git status", then cursor-left 4 → "atus" sits right of cursor
         t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07git status\x1b[4D");
+        assert_eq!(t.current_input(), None);
+    }
+
+    #[test]
+    fn current_input_cleared_by_alt_screen() {
+        let mut t = Terminal::new(40, 5);
+        t.feed(b"\x1b]133;A\x07$ \x1b]133;B\x07vim notes");
+        assert_eq!(t.current_input(), Some("vim notes".to_string()));
+        t.feed(b"\x1b[?1049h");
         assert_eq!(t.current_input(), None);
     }
 
