@@ -203,6 +203,10 @@ class TerminalMetalView: MTKView {
         aiPanel?.toggle(over: window)
     }
 
+    @objc func copy(_ sender: Any?) { copySelection() }
+    @objc func paste(_ sender: Any?) { pasteClipboard() }
+    @objc func toggleAI(_ sender: Any?) { toggleAIPanel() }
+
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.modifierFlags.contains(.command) else {
             return super.performKeyEquivalent(with: event)
