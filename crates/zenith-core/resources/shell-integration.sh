@@ -2,6 +2,7 @@
 # Installed by Zenith to ~/.config/zenith/shell-integration.sh (overwritten on update).
 # Enable by adding to your ~/.zshrc or ~/.bashrc:
 #   [ -n "$ZENITH_SHELL_INTEGRATION" ] && . ~/.config/zenith/shell-integration.sh
+# Put that line after any prompt customization — redefining PS1/PS0 later removes the markers.
 
 if [ -n "$ZENITH_INTEGRATION_LOADED" ]; then
     return 0
