@@ -40,6 +40,8 @@ impl History {
         self.persist();
     }
 
+    // The returned entry must start_with the raw prefix: callers slice the
+    // remainder as entry[prefix.len()..], so never trim prefix before matching.
     pub fn suggest(&self, prefix: &str) -> Option<&str> {
         if prefix.trim().is_empty() {
             return None;
