@@ -127,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn suggest_most_recent_first() {
+    fn suggest_reranks_as_occurrences_accumulate() {
         let mut h = History::load(temp_path("recent"));
         h.append("git status");
         h.append("git stash");
