@@ -5,6 +5,7 @@ import CZenith
 @main
 struct ZenithApp {
     static func main() {
+        FileManager.default.changeCurrentDirectoryPath(NSHomeDirectory())
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
