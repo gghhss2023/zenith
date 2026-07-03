@@ -87,6 +87,10 @@ impl Terminal {
         self.state.show_cursor
     }
 
+    pub fn is_alt_screen(&self) -> bool {
+        self.state.alt_grid.is_some()
+    }
+
     pub fn title(&self) -> &str {
         &self.state.title
     }
@@ -761,6 +765,16 @@ mod tests {
         assert_eq!(t.current_input(), Some("vim notes".to_string()));
         t.feed(b"\x1b[?1049h");
         assert_eq!(t.current_input(), None);
+    }
+
+    #[test]
+    fn is_alt_screen_tracks_1049() {
+        let mut t = Terminal::new(10, 4);
+        assert!(!t.is_alt_screen());
+        t.feed(b"\x1b[?1049h");
+        assert!(t.is_alt_screen());
+        t.feed(b"\x1b[?1049l");
+        assert!(!t.is_alt_screen());
     }
 
     #[test]
