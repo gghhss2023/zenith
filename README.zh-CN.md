@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.png" width="128" alt="Zenith logo">
+
 # Zenith
 
 **基于 Rust 与 Metal 的 macOS GPU 加速终端模拟器。**

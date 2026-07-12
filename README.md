@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.png" width="128" alt="Zenith logo">
+
 # Zenith
 
 **A GPU-accelerated terminal emulator for macOS, built with Rust and Metal.**
