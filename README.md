@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.png" width="128" alt="Zenith logo">
+<img src="docs/assets/logo.png" width="220" alt="Zenith logo">
 
 # Zenith
 
