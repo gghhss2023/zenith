@@ -75,6 +75,16 @@ char *zn_terminal_selection_text(ZenithTerminal *term,
                                  uint32_t end_col, uint32_t end_row);
 void zn_string_free(char *s);
 char *zn_terminal_screen_text(ZenithTerminal *term, uint32_t scrollback_lines);
+
+typedef struct {
+    int32_t start_screen_row;
+    int32_t end_screen_row;
+    int32_t exit_code;
+} ZNBlockInfo;
+
+uint32_t zn_terminal_block_count(ZenithTerminal *term);
+bool zn_terminal_block_get(ZenithTerminal *term, uint32_t idx, ZNBlockInfo *out);
+char *zn_terminal_block_text(ZenithTerminal *term, uint32_t idx);
 char *zn_terminal_accept_suggestion(ZenithTerminal *term);
 
 ZNConfig *zn_config_load(void);

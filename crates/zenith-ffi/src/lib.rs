@@ -350,6 +350,67 @@ pub extern "C" fn zn_terminal_accept_suggestion(term: *mut ZenithTerminal) -> *m
         .unwrap_or(std::ptr::null_mut())
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct ZNBlockInfo {
+    pub start_screen_row: i32,
+    pub end_screen_row: i32,
+    pub exit_code: i32,
+}
+
+#[no_mangle]
+pub extern "C" fn zn_terminal_block_count(term: *mut ZenithTerminal) -> u32 {
+    if term.is_null() {
+        return 0;
+    }
+    let term = unsafe { &*term };
+    if term.term.is_alt_screen() {
+        return 0;
+    }
+    term.term.blocks().len() as u32
+}
+
+#[no_mangle]
+pub extern "C" fn zn_terminal_block_get(
+    term: *mut ZenithTerminal,
+    idx: u32,
+    out: *mut ZNBlockInfo,
+) -> bool {
+    if term.is_null() || out.is_null() {
+        return false;
+    }
+    let term = unsafe { &*term };
+    if term.term.is_alt_screen() {
+        return false;
+    }
+    let block = match term.term.blocks().get(idx as usize) {
+        Some(b) => b,
+        None => return false,
+    };
+    let grid = term.term.grid();
+    let top_abs = grid.total_lines() as i64 - grid.display_offset() as i64;
+    unsafe {
+        *out = ZNBlockInfo {
+            start_screen_row: (block.start_row as i64 - top_abs) as i32,
+            end_screen_row: (block.end_row as i64 - top_abs) as i32,
+            exit_code: block.exit_code,
+        };
+    }
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn zn_terminal_block_text(term: *mut ZenithTerminal, idx: u32) -> *mut c_char {
+    if term.is_null() {
+        return std::ptr::null_mut();
+    }
+    let term = unsafe { &*term };
+    match term.term.block_text(idx as usize) {
+        Some(t) if !t.is_empty() => CString::new(t).unwrap_or_default().into_raw(),
+        _ => std::ptr::null_mut(),
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn zn_string_free(s: *mut c_char) {
     if !s.is_null() {

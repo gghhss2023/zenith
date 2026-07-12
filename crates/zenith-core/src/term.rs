@@ -10,6 +10,16 @@ enum ShellState {
     Running,
 }
 
+#[derive(Debug, Clone)]
+pub struct CommandBlock {
+    pub command: String,
+    pub start_row: usize,
+    pub end_row: usize,
+    pub exit_code: i32,
+}
+
+const MAX_BLOCKS: usize = 500;
+
 struct TerminalState {
     grid: Grid,
     alt_grid: Option<Grid>,
@@ -32,6 +42,8 @@ struct TerminalState {
     input_start: Option<(usize, usize)>,
     pending_command: Option<String>,
     completed_commands: Vec<String>,
+    blocks: Vec<CommandBlock>,
+    block_start: Option<usize>,
 }
 
 pub struct Terminal {
@@ -64,6 +76,8 @@ impl Terminal {
                 input_start: None,
                 pending_command: None,
                 completed_commands: Vec::new(),
+                blocks: Vec::new(),
+                block_start: None,
             },
             parser: Parser::new(),
         }
@@ -136,6 +150,15 @@ impl Terminal {
         let cur_abs = self.state.grid.scrollback_len() + self.state.cursor_row;
         self.state
             .extract_text(col, abs_row, self.state.cursor_col, cur_abs)
+    }
+
+    pub fn blocks(&self) -> &[CommandBlock] {
+        &self.state.blocks
+    }
+
+    pub fn block_text(&self, idx: usize) -> Option<String> {
+        let b = self.state.blocks.get(idx)?;
+        Some(self.state.grid.abs_rows_text(b.start_row, b.end_row))
     }
 
     pub fn take_completed_command(&mut self) -> Option<String> {
@@ -211,6 +234,12 @@ impl TerminalState {
     fn enter_alt_screen(&mut self) {
         self.shell_state = ShellState::Ground;
         self.input_start = None;
+        self.block_start = None;
+        // xterm 1049: save cursor before switching, restore on exit
+        self.saved_cursor_col = self.cursor_col;
+        self.saved_cursor_row = self.cursor_row;
+        self.cursor_col = 0;
+        self.cursor_row = 0;
         let cols = self.grid.cols();
         let rows = self.grid.rows();
         let main = std::mem::replace(&mut self.grid, Grid::new(cols, rows, 0));
@@ -221,19 +250,26 @@ impl TerminalState {
         if let Some(main) = self.alt_grid.take() {
             self.grid = main;
             self.grid.mark_all_dirty();
+            self.cursor_col = self.saved_cursor_col.min(self.grid.cols() - 1);
+            self.cursor_row = self.saved_cursor_row.min(self.grid.rows() - 1);
         }
     }
 
-    fn handle_shell_marker(&mut self, param: &[u8]) {
-        match param.first() {
+    fn handle_shell_marker(&mut self, params: &[&[u8]]) {
+        match params[0].first() {
             Some(b'A') => {
                 self.shell_state = ShellState::Prompt;
                 self.input_start = None;
+                // fresh prompt: drop SGR state leaked by full-screen apps (e.g. btop exits with bg set)
+                self.current_fg = DEFAULT_FG;
+                self.current_bg = DEFAULT_BG;
+                self.current_attrs = CellAttrs::empty();
             }
             Some(b'B') => {
                 self.shell_state = ShellState::Input;
                 self.input_start =
                     Some((self.cursor_col, self.grid.scrollback_len() + self.cursor_row));
+                self.block_start = Some(self.grid.total_lines() + self.cursor_row);
             }
             Some(b'C') => {
                 if let Some((col, abs_row)) = self.input_start {
@@ -245,14 +281,34 @@ impl TerminalState {
                 self.input_start = None;
             }
             Some(b'D') => {
+                let exit_code = params
+                    .get(1)
+                    .and_then(|p| std::str::from_utf8(p).ok())
+                    .and_then(|s| s.trim().parse::<i32>().ok())
+                    .unwrap_or(0);
                 if let Some(cmd) = self.pending_command.take() {
                     let cmd = cmd.trim().to_string();
                     if !cmd.is_empty() {
+                        if let Some(start) = self.block_start.take() {
+                            let end = (self.grid.total_lines() + self.cursor_row)
+                                .saturating_sub(1)
+                                .max(start);
+                            self.blocks.push(CommandBlock {
+                                command: cmd.clone(),
+                                start_row: start,
+                                end_row: end,
+                                exit_code,
+                            });
+                            if self.blocks.len() > MAX_BLOCKS {
+                                self.blocks.remove(0);
+                            }
+                        }
                         self.completed_commands.push(cmd);
                     }
                 }
                 self.shell_state = ShellState::Ground;
                 self.input_start = None;
+                self.block_start = None;
             }
             _ => {}
         }
@@ -386,7 +442,7 @@ impl Perform for TerminalState {
                 }
             }
             b"133" if params.len() > 1 => {
-                self.handle_shell_marker(params[1]);
+                self.handle_shell_marker(&params[1..]);
             }
             _ => {}
         }
@@ -765,6 +821,15 @@ mod tests {
         assert_eq!(t.current_input(), Some("vim notes".to_string()));
         t.feed(b"\x1b[?1049h");
         assert_eq!(t.current_input(), None);
+    }
+
+    #[test]
+    fn alt_screen_restores_cursor_position() {
+        let mut t = Terminal::new(40, 10);
+        t.feed(b"$ btop\r\n");
+        let before = t.cursor();
+        t.feed(b"\x1b[?1049h\x1b[5;5Halt content\x1b[?1049l");
+        assert_eq!(t.cursor(), before);
     }
 
     #[test]

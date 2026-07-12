@@ -99,6 +99,9 @@ class TerminalMetalView: MTKView {
         cellWidth = w
         cellHeight = h
 
+        // Initial cols/rows were computed with placeholder cell metrics; fix PTY size now
+        updateTerminalSize()
+
         let fd = zn_terminal_pty_fd(terminal)
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
         source.setEventHandler { [weak self] in
@@ -268,7 +271,8 @@ class TerminalMetalView: MTKView {
 
         let modifiers = event.modifierFlags
 
-        if event.keyCode == 124,
+        // Right arrow or Tab accepts ghost-text suggestion; Tab falls through to shell if none
+        if event.keyCode == 124 || event.keyCode == 48,
            !modifiers.contains(.shift), !modifiers.contains(.control),
            !modifiers.contains(.option), !modifiers.contains(.command),
            let cstr = zn_terminal_accept_suggestion(terminal) {

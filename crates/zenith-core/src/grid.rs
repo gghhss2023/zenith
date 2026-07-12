@@ -6,6 +6,7 @@ pub struct Grid {
     cells: Vec<Cell>,
     scrollback: Vec<Vec<Cell>>,
     scrollback_limit: usize,
+    trimmed: usize,
     display_offset: usize,
     dirty: Vec<bool>,
 }
@@ -18,6 +19,7 @@ impl Grid {
             cells: vec![Cell::default(); cols * rows],
             scrollback: Vec::new(),
             scrollback_limit,
+            trimmed: 0,
             display_offset: 0,
             dirty: vec![true; rows],
         }
@@ -64,6 +66,7 @@ impl Grid {
                 self.scrollback.push(row_data);
                 if self.scrollback.len() > self.scrollback_limit {
                     self.scrollback.remove(0);
+                    self.trimmed += 1;
                 }
                 if self.display_offset > 0 {
                     self.display_offset = (self.display_offset + 1).min(self.scrollback.len());
@@ -148,6 +151,41 @@ impl Grid {
 
     pub fn scrollback_len(&self) -> usize {
         self.scrollback.len()
+    }
+
+    // Monotonic count of lines ever pushed above the screen (survives trimming).
+    pub fn total_lines(&self) -> usize {
+        self.trimmed + self.scrollback.len()
+    }
+
+    pub fn abs_rows_text(&self, start_abs: usize, end_abs: usize) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for abs in start_abs..=end_abs {
+            if abs < self.trimmed {
+                continue;
+            }
+            let idx = abs - self.trimmed;
+            let mut s = String::new();
+            if idx < self.scrollback.len() {
+                for cell in &self.scrollback[idx] {
+                    if cell.width != 0 {
+                        s.push(cell.c);
+                    }
+                }
+            } else {
+                let row = idx - self.scrollback.len();
+                if row >= self.rows {
+                    break;
+                }
+                for cell in self.row_slice(row) {
+                    if cell.width != 0 {
+                        s.push(cell.c);
+                    }
+                }
+            }
+            lines.push(s.trim_end().to_string());
+        }
+        lines.join("\n")
     }
 
     pub fn display_offset(&self) -> usize {

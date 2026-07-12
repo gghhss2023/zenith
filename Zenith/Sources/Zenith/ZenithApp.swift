@@ -14,20 +14,27 @@ struct ZenithApp {
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var window: NSWindow!
-    var terminalView: TerminalMetalView!
+    private var windows: [NSWindow] = []
+    private var cascadePoint = NSPoint.zero
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         zn_init()
         setupMainMenu()
 
+        openTerminalWindow(asTab: false)
+
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func makeTerminalWindow() -> NSWindow {
         let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
         let windowWidth: CGFloat = 1000
         let windowHeight: CGFloat = 600
         let windowX = (screenFrame.width - windowWidth) / 2
         let windowY = (screenFrame.height - windowHeight) / 2
 
-        window = NSWindow(
+        let window = NSWindow(
             contentRect: NSRect(x: windowX, y: windowY, width: windowWidth, height: windowHeight),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
@@ -40,23 +47,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.titleVisibility = .hidden
         window.isOpaque = false
         window.minSize = NSSize(width: 400, height: 300)
+        window.tabbingIdentifier = "ZenithTerminal"
+        window.isReleasedWhenClosed = false
 
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal is not supported on this device")
         }
 
-        terminalView = TerminalMetalView(frame: window.contentView!.bounds, device: device)
+        let terminalView = TerminalMetalView(frame: window.contentView!.bounds, device: device)
         terminalView.autoresizingMask = [.width, .height]
-
         window.contentView?.addSubview(terminalView)
+
+        windows.append(window)
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { [weak self] note in
+            guard let closed = note.object as? NSWindow else { return }
+            self?.windows.removeAll { $0 === closed }
+        }
+
+        return window
+    }
+
+    private func openTerminalWindow(asTab: Bool) {
+        let window = makeTerminalWindow()
+
+        if asTab, let keyWindow = NSApp.keyWindow ?? windows.dropLast().last {
+            keyWindow.addTabbedWindow(window, ordered: .above)
+        } else {
+            cascadePoint = window.cascadeTopLeft(from: cascadePoint)
+        }
+
         window.makeKeyAndOrderFront(nil)
 
-        terminalView.startTerminal()
-
-        window.makeFirstResponder(terminalView)
-
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        if let terminalView = window.contentView?.subviews.first as? TerminalMetalView {
+            terminalView.startTerminal()
+            window.makeFirstResponder(terminalView)
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -99,6 +126,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         shellItem.submenu = shellMenu
         shellMenu.addItem(NSMenuItem(
             title: "New Window", action: #selector(AppDelegate.newWindow(_:)), keyEquivalent: "n"))
+        shellMenu.addItem(NSMenuItem(
+            title: "New Tab", action: #selector(AppDelegate.newTab(_:)), keyEquivalent: "t"))
         shellMenu.addItem(NSMenuItem(
             title: "Close Window", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
 
@@ -165,9 +194,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func newWindow(_ sender: Any?) {
-        let config = NSWorkspace.OpenConfiguration()
-        config.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config)
+        openTerminalWindow(asTab: false)
+    }
+
+    @objc func newTab(_ sender: Any?) {
+        openTerminalWindow(asTab: true)
     }
 
     @objc func openGitHub(_ sender: Any?) {
