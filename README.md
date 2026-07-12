@@ -6,7 +6,7 @@
 
 **A GPU-accelerated terminal emulator for macOS, built with Rust and Metal.**
 
-[![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)](https://github.com/gghhss2023/zenith/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)](https://github.com/Gkyohd/zenith/releases)
 [![Rust](https://img.shields.io/badge/core-Rust-orange?logo=rust)](crates/)
 [![Swift](https://img.shields.io/badge/UI-Swift%20%2B%20Metal-F05138?logo=swift)](Zenith/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -34,12 +34,12 @@
 
 ## Install
 
-Grab the latest `.dmg` from [Releases](https://github.com/gghhss2023/zenith/releases), drag **Zenith** into `/Applications`.
+Grab the latest `.dmg` from [Releases](https://github.com/Gkyohd/zenith/releases), drag **Zenith** into `/Applications`.
 
 Or build from source:
 
 ```bash
-git clone https://github.com/gghhss2023/zenith.git
+git clone https://github.com/Gkyohd/zenith.git
 cd zenith
 make install   # builds release binaries, bundles Zenith.app, installs to /Applications
 ```

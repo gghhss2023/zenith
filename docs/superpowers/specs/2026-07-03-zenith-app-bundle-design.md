@@ -28,7 +28,7 @@ tree — it cannot run outside the repo.
 - **Bundle assembly.** `make app` builds release and assembles
   `dist/Zenith.app/Contents/{MacOS/Zenith, Info.plist, Resources/Zenith.icns}`,
   then ad-hoc codesigns (`codesign --force --deep -s -`). Info.plist keys:
-  identifier `io.github.gghhss2023.zenith`, name/executable/icon `Zenith`,
+  identifier `io.github.Gkyohd.zenith`, name/executable/icon `Zenith`,
   `LSMinimumSystemVersion 14.0`, `NSHighResolutionCapable`, version 0.1.0.
 - **Install & DMG.** `make install` ditto-copies the bundle to
   `/Applications/Zenith.app` (replacing any old copy). `make dmg` builds

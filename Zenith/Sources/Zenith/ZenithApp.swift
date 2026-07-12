@@ -202,6 +202,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func openGitHub(_ sender: Any?) {
-        NSWorkspace.shared.open(URL(string: "https://github.com/gghhss2023/zenith")!)
+        NSWorkspace.shared.open(URL(string: "https://github.com/Gkyohd/zenith")!)
     }
 }

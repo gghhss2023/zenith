@@ -5,7 +5,7 @@ Thanks for your interest in contributing!
 ## Getting started
 
 ```bash
-git clone https://github.com/gghhss2023/zenith.git
+git clone https://github.com/Gkyohd/zenith.git
 cd zenith
 make build     # debug build (Rust + Swift)
 make check     # cargo test + clippy — must pass before submitting

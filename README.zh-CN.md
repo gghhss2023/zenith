@@ -6,7 +6,7 @@
 
 **基于 Rust 与 Metal 的 macOS GPU 加速终端模拟器。**
 
-[![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)](https://github.com/gghhss2023/zenith/releases)
+[![Platform](https://img.shields.io/badge/platform-macOS-black?logo=apple)](https://github.com/Gkyohd/zenith/releases)
 [![Rust](https://img.shields.io/badge/core-Rust-orange?logo=rust)](crates/)
 [![Swift](https://img.shields.io/badge/UI-Swift%20%2B%20Metal-F05138?logo=swift)](Zenith/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -34,12 +34,12 @@
 
 ## 安装
 
-从 [Releases](https://github.com/gghhss2023/zenith/releases) 下载最新 `.dmg`，把 **Zenith** 拖进 `/Applications` 即可。
+从 [Releases](https://github.com/Gkyohd/zenith/releases) 下载最新 `.dmg`，把 **Zenith** 拖进 `/Applications` 即可。
 
 或从源码构建：
 
 ```bash
-git clone https://github.com/gghhss2023/zenith.git
+git clone https://github.com/Gkyohd/zenith.git
 cd zenith
 make install   # 编译 release 版本，打包 Zenith.app 并安装到 /Applications
 ```

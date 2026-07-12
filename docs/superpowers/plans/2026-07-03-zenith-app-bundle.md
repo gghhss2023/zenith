@@ -215,7 +215,7 @@ git commit -m "feat: add app icon and icon generation script"
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>io.github.gghhss2023.zenith</string>
+	<string>io.github.Gkyohd.zenith</string>
 	<key>CFBundleName</key>
 	<string>Zenith</string>
 	<key>CFBundleDisplayName</key>
