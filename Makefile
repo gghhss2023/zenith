@@ -22,7 +22,7 @@ check:
 	cargo clippy --workspace -- -D warnings
 
 APP_NAME = Zenith
-VERSION = 0.1.0
+VERSION = 0.2.0
 DIST = dist
 APP = $(DIST)/$(APP_NAME).app
 
