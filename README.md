@@ -8,6 +8,9 @@
 [![Rust](https://img.shields.io/badge/core-Rust-orange?logo=rust)](crates/)
 [![Swift](https://img.shields.io/badge/UI-Swift%20%2B%20Metal-F05138?logo=swift)](Zenith/)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Follow on X](https://img.shields.io/badge/follow-%40qqqtelegram-1DA1F2?logo=x&logoColor=white)](https://x.com/qqqtelegram)
+
+**English** · [简体中文](README.zh-CN.md)
 
 *Fast where it matters. Quiet where it counts.*
 
