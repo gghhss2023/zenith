@@ -71,6 +71,14 @@ impl Config {
     }
 
     pub fn config_path() -> PathBuf {
+        // Prefer XDG-style ~/.config (terminal convention, matches ghostty);
+        // dirs::config_dir() is ~/Library/Application Support on macOS.
+        if let Some(home) = dirs::home_dir() {
+            let xdg = home.join(".config").join("zenith").join("zenith.toml");
+            if xdg.exists() {
+                return xdg;
+            }
+        }
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("~/.config"))
             .join("zenith")

@@ -8,6 +8,8 @@ build:
 
 release:
 	cargo build --release
+	# SwiftPM doesn't track the unsafeFlags .a as a dependency; force relink
+	rm -f Zenith/.build/release/Zenith
 	cd Zenith && swift build -c release
 
 run: build

@@ -87,6 +87,12 @@ impl FontContext {
                         return None;
                     }
 
+                    // Emulate CoreText stem darkening: boost coverage so glyphs
+                    // match the heavier look of native macOS text rendering.
+                    let thicken = |alpha: u8| -> u8 {
+                        (255.0 * (alpha as f32 / 255.0).powf(0.72)).round() as u8
+                    };
+
                     let rgba = match image.content {
                         cosmic_text::SwashContent::Mask => {
                             let mut rgba = vec![0u8; (width * height * 4) as usize];
@@ -94,7 +100,7 @@ impl FontContext {
                                 rgba[i * 4] = 255;
                                 rgba[i * 4 + 1] = 255;
                                 rgba[i * 4 + 2] = 255;
-                                rgba[i * 4 + 3] = alpha;
+                                rgba[i * 4 + 3] = thicken(alpha);
                             }
                             rgba
                         }
@@ -114,7 +120,7 @@ impl FontContext {
                                 rgba[i * 4] = 255;
                                 rgba[i * 4 + 1] = 255;
                                 rgba[i * 4 + 2] = 255;
-                                rgba[i * 4 + 3] = avg;
+                                rgba[i * 4 + 3] = thicken(avg);
                             }
                             rgba
                         }
