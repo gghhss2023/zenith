@@ -22,7 +22,7 @@ impl Color {
     }
 }
 
-pub const DEFAULT_FG: Color = Color::rgb(200, 200, 200);
+pub const DEFAULT_FG: Color = Color::rgb(235, 235, 235);
 pub const DEFAULT_BG: Color = Color::rgb(26, 27, 38);
 
 bitflags! {

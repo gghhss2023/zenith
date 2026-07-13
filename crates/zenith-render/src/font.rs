@@ -54,7 +54,15 @@ impl FontContext {
         bold: bool,
         italic: bool,
     ) -> Option<RasterizedGlyph> {
-        let metrics = Metrics::new(self.font_size, self.cell_height);
+        // Wide (CJK) glyphs are rasterized at their natural 1em, but occupy
+        // two cells (2 * cell_width > 1em for JetBrains Mono's 0.6em advance),
+        // leaving gaps. Scale them up so the em fills the double cell.
+        let size = if unicode_width::UnicodeWidthChar::width(c) == Some(2) {
+            (self.cell_width * 2.0).min(self.font_size * 1.3)
+        } else {
+            self.font_size
+        };
+        let metrics = Metrics::new(size, self.cell_height.max(size * 1.2));
         let mut buffer = Buffer::new(&mut self.font_system, metrics);
         buffer.set_size(
             &mut self.font_system,
@@ -90,7 +98,7 @@ impl FontContext {
                     // Emulate CoreText stem darkening: boost coverage so glyphs
                     // match the heavier look of native macOS text rendering.
                     let thicken = |alpha: u8| -> u8 {
-                        (255.0 * (alpha as f32 / 255.0).powf(0.72)).round() as u8
+                        (255.0 * (alpha as f32 / 255.0).powf(0.65)).round() as u8
                     };
 
                     let rgba = match image.content {
