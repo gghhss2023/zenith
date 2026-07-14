@@ -16,6 +16,8 @@
 
 *Fast where it matters. Quiet where it counts.*
 
+<img src="docs/assets/demo.gif" width="820" alt="Zenith demo: ghost-text autosuggest, AI command generation, btop, live font scaling">
+
 </div>
 
 ---

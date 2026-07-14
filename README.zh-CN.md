@@ -16,6 +16,8 @@
 
 *快在刀刃上，静在无声处。*
 
+<img src="docs/assets/demo.gif" width="820" alt="Zenith 演示：ghost-text 自动补全、AI 生成命令、btop、实时字体缩放">
+
 </div>
 
 ---
