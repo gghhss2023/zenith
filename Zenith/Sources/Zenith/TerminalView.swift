@@ -75,6 +75,8 @@ class TerminalMetalView: MTKView {
         glyphPipeline = try! device.makeRenderPipelineState(descriptor: glyphDesc)
 
         uniformBuffer = device.makeBuffer(length: 8, options: .storageModeShared)
+
+        registerForDraggedTypes([.fileURL])
     }
 
     func startTerminal() {
@@ -201,6 +203,27 @@ class TerminalMetalView: MTKView {
         bytes.withUnsafeBufferPointer { buf in
             zn_terminal_write(terminal, buf.baseAddress, UInt32(buf.count))
         }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        return sender.draggingPasteboard.canReadObject(forClasses: [NSURL.self], options: nil) ? .copy : []
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
+              !urls.isEmpty else { return false }
+        let quoted = urls.map { shellQuote($0.path) }.joined(separator: " ")
+        insertToPrompt(quoted + " ")
+        return true
+    }
+
+    private func shellQuote(_ path: String) -> String {
+        // Single-quote and escape embedded single quotes: it's -> 'it'\''s'
+        if path.range(of: "^[A-Za-z0-9_./-]+$", options: .regularExpression) != nil {
+            return path
+        }
+        return "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     private func toggleAIPanel() {
